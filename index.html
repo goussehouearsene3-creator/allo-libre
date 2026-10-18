@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c5cff">
+<title>Allô Libre</title>
+<style>
+:root{--ac:#7c5cff;--bg:#f7f5ff;--sf:#fff;--tx:#16181d;--mu:#6b7280;--bd:#ebe7fb;--me:linear-gradient(135deg,#7c5cff,#c04cfd)}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0c18;--sf:#1a1730;--tx:#eceef1;--mu:#9aa1ab;--bd:#2b2650}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+header{background:linear-gradient(135deg,#7c5cff,#ff5fa2);color:#fff;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 20px;border-radius:0 0 26px 26px;box-shadow:0 8px 24px rgba(124,92,255,.35);display:flex;align-items:center;gap:8px;font-weight:700;font-size:21px}
+header button{background:none;border:0;color:#fff;font-size:24px;padding:0 6px}
+#ttl{flex:1}
+main{flex:1;overflow-y:auto;padding:18px 16px}
+input{width:100%;padding:14px 18px;border-radius:999px;border:1px solid var(--bd);background:var(--sf);color:var(--tx);font-size:16px;outline:0;margin:6px 0}
+input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+.row{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--bd);border-radius:18px;padding:12px 14px;margin:10px 0;cursor:pointer}
+.row:active{transform:scale(.97)}
+.av{width:46px;height:46px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex:none}
+.mu{color:var(--mu);font-size:14px}
+.pv{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bdg{width:12px;height:12px;border-radius:50%;background:#ff5fa2;flex:none}
+.b{max-width:78%;padding:10px 15px;border-radius:20px 20px 20px 6px;margin:4px 0;background:var(--sf);border:1px solid var(--bd);word-wrap:break-word;animation:pop .2s ease-out}
+.b.me{background:var(--me);color:#fff;border:0;margin-left:auto;border-radius:20px 20px 6px 20px}
+.tm{display:block;font-size:11px;opacity:.65;text-align:right;margin-top:3px}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+#bar{display:none;gap:8px;padding:12px 14px}
+#bar input{margin:0}
+#bar button{width:48px;height:48px;border-radius:50%;border:0;font-size:20px;color:#fff;background:linear-gradient(135deg,#7c5cff,#ff5fa2);flex:none}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:22px;padding:20px;margin-top:10px}
+.card h2{margin:0 0 8px}
+.btn{width:100%;padding:14px;border:0;border-radius:999px;color:#fff;font-size:16px;font-weight:700;background:linear-gradient(135deg,#7c5cff,#ff5fa2);margin-top:8px}
+.er{color:#ef4444;min-height:20px;margin:6px 0;font-size:14px}
+a{color:var(--ac);cursor:pointer;font-weight:600}
+.empty{text-align:center;color:var(--mu);padding:36px 12px}
+#call{display:none;position:fixed;inset:0;z-index:50;background:linear-gradient(160deg,#4b2fd6,#c04cfd 60%,#ff5fa2);color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+.cav{width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:700;animation:pl 1.6s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}100%{box-shadow:0 0 0 28px rgba(255,255,255,0)}}
+#call h2{margin:14px 0 0;font-size:26px}
+.cb{display:flex;gap:36px;margin-top:40px}
+.cb button{width:70px;height:70px;border-radius:50%;border:0;font-size:28px;color:#fff}
+.ok{background:#1fc16b}.no{background:#ef4444}
+</style>
+</head>
+<body>
+<header><button id="back" hidden>←</button><span id="ttl">📞 Allô Libre</span><button id="tel" hidden>📞</button><button id="out" hidden title="Déconnexion">⏻</button></header>
+<main id="m"><p class="mu">Chargement…</p></main>
+<div id="bar"><input id="txt" placeholder="Écris un message…" autocomplete="off"><button id="send">➤</button></div>
+<div id="call"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,updateProfile} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,setDoc,getDoc,updateDoc,addDoc,collection,query,where,orderBy,limit,onSnapshot,getDocs} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyBKD7ONubhwvbO6si_6SjbOwlM9dx9Jp3U",
+  authDomain:"allo-libre.firebaseapp.com",
+  projectId:"allo-libre",
+  storageBucket:"allo-libre.firebasestorage.app",
+  messagingSenderId:"459437138683",
+  appId:"1:459437138683:web:da50076e178af360c5865e"
+});
+const auth=getAuth(app),db=getFirestore(app);
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ini=n=>(n||'?').trim().charAt(0).toUpperCase();
+const hue=n=>[...String(n||'x')].reduce((a,c)=>a+c.charCodeAt(0),0)*37%360;
+const av=n=>`<div class="av" style="background:hsl(${hue(n)} 70% 55%)">${esc(ini(n))}</div>`;
+const hm=t=>new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+let me=null,un=null,callUn=null,signing=false;
+const myName=()=>me.displayName||me.email.split('@')[0];
+const cidOf=o=>[me.uid,o].sort().join('_');
+function head(t,back){$('ttl').textContent=t;$('back').hidden=!back;$('back').onclick=back||null;$('tel').hidden=true;$('out').hidden=!me;$('bar').style.display='none'}
+function stop(){if(un){un();un=null}}
+const ERR={'auth/invalid-credential':'E-mail ou mot de passe incorrect.','auth/invalid-email':'E-mail invalide.','auth/email-already-in-use':'Cet e-mail est déjà utilisé.','auth/weak-password':'Mot de passe trop court (6 caractères minimum).','auth/network-request-failed':'Pas de connexion Internet.','auth/missing-password':'Entre ton mot de passe.'};
+
+function authView(){
+  stop();head('📞 Allô Libre');
+  let sign=false;
+  const draw=()=>{
+    $('m').innerHTML=`<div class="card"><h2>${sign?'Créer un compte':'Connexion'}</h2>${sign?'<input id="nm" placeholder="Ton prénom">':''}<input id="em" type="email" placeholder="E-mail" autocomplete="email"><input id="pw" type="password" placeholder="Mot de passe (6 caractères min.)"><p id="er" class="er"></p><button id="go" class="btn">${sign?'S’inscrire':'Se connecter'}</button><p class="mu" style="text-align:center;margin-top:14px"><a id="sw">${sign?'J’ai déjà un compte':'Créer un compte'}</a></p></div>`;
+    $('sw').onclick=()=>{sign=!sign;draw()};
+    $('go').onclick=async()=>{
+      const em=$('em').value.trim(),pw=$('pw').value,nm=sign?$('nm').value.trim():'';
+      $('er').textContent='';
+      if(sign&&!nm){$('er').textContent='Entre ton prénom.';return}
+      try{
+        if(sign){
+          signing=true;
+          const c=await createUserWithEmailAndPassword(auth,em,pw);
+          await updateProfile(c.user,{displayName:nm});
+          await setDoc(doc(db,'users',c.user.uid),{name:nm,nameLower:nm.toLowerCase(),email:em.toLowerCase()},{merge:true});
+          signing=false;me=auth.currentUser;home();listenCalls();
+        }else await signInWithEmailAndPassword(auth,em,pw);
+      }catch(e){signing=false;$('er').textContent=ERR[e.code]||'Erreur : '+(e.code||e.message)}
+    };
+  };
+  draw();
+}
+
+function home(){
+  stop();head('📞 Allô Libre');
+  $('m').innerHTML='<input id="q" placeholder="Chercher par prénom ou e-mail…"><div id="res"></div><p class="mu" style="margin-top:18px">Conversations</p><div id="lst"><p class="mu">Chargement…</p></div>';
+  un=onSnapshot(query(collection(db,'chats'),where('members','array-contains',me.uid)),s=>{
+    const L=s.docs.map(d=>d.data()).filter(d=>d.lastT).sort((a,b)=>b.lastT-a.lastT);
+    $('lst').innerHTML=L.length?L.map(d=>{
+      const o=d.members.find(x=>x!==me.uid),n=(d.names||{})[o]||'Contact';
+      const nw=d.lastFrom!==me.uid&&d.lastT>(d['read_'+me.uid]||0);
+      return `<div class="row" data-u="${esc(o)}" data-n="${esc(n)}">${av(n)}<div style="flex:1;min-width:0"><b>${esc(n)}</b><div class="mu pv">${d.lastFrom===me.uid?'Toi : ':''}${esc(d.last)}</div></div>${nw?'<span class="bdg"></span>':''}</div>`}).join(''):'<div class="empty"><div style="font-size:42px">✨</div>Cherche un contact pour lancer ta première conversation</div>';
+    $('lst').querySelectorAll('.row').forEach(r=>r.onclick=()=>chat({uid:r.dataset.u,name:r.dataset.n}));
+  },()=>{$('lst').innerHTML='<p class="mu">Impossible de charger.</p>'});
+  let tm;
+  $('q').oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>search(e.target.value.trim().toLowerCase()),300)};
+}
+async function search(q){
+  if(!q){$('res').innerHTML='';return}
+  try{
+    const qs=[getDocs(query(collection(db,'users'),where('nameLower','>=',q),where('nameLower','<=',q+'\uf8ff'),limit(10)))];
+    if(q.includes('@'))qs.push(getDocs(query(collection(db,'users'),where('email','==',q))));
+    const seen={};
+    (await Promise.all(qs)).forEach(s=>s.docs.forEach(d=>{if(d.id!==me.uid)seen[d.id]=d.data().name}));
+    const ids=Object.keys(seen);
+    $('res').innerHTML=ids.length?ids.map(id=>`<div class="row" data-u="${esc(id)}" data-n="${esc(seen[id])}">${av(seen[id])}<b>${esc(seen[id])}</b></div>`).join(''):'<p class="mu">Personne trouvé.</p>';
+    $('res').querySelectorAll('.row').forEach(r=>r.onclick=()=>chat({uid:r.dataset.u,name:r.dataset.n}));
+  }catch(e){$('res').innerHTML='<p class="mu">Recherche indisponible.</p>'}
+}
+
+function chat(p){
+  stop();head(p.name,home);
+  $('tel').hidden=false;$('tel').onclick=()=>startCall(p);
+  $('bar').style.display='flex';$('m').innerHTML='';
+  const cid=cidOf(p.uid),cref=doc(db,'chats',cid);
+  un=onSnapshot(query(collection(db,'chats',cid,'msgs'),orderBy('t'),limit(300)),s=>{
+    $('m').innerHTML=s.docs.map(d=>{const x=d.data();return `<div class="b ${x.from===me.uid?'me':''}">${esc(x.text)}<span class="tm">${hm(x.t)}</span></div>`}).join('')||'<p class="mu">Dis bonjour 👋</p>';
+    $('m').scrollTop=1e9;
+    setDoc(cref,{['read_'+me.uid]:Date.now()},{merge:true}).catch(()=>{});
+  },()=>{$('m').innerHTML='<p class="mu">Impossible de charger les messages.</p>'});
+  const send=async()=>{
+    const text=$('txt').value.trim();if(!text)return;$('txt').value='';
+    const t=Date.now();
+    try{
+      await addDoc(collection(db,'chats',cid,'msgs'),{from:me.uid,text,t});
+      await setDoc(cref,{members:[me.uid,p.uid],names:{[me.uid]:myName(),[p.uid]:p.name},last:text,lastFrom:me.uid,lastT:t,['read_'+me.uid]:t},{merge:true});
+    }catch(e){$('txt').value=text}
+  };
+  $('send').onclick=send;$('txt').onkeydown=e=>{if(e.key==='Enter')send()};
+}
+
+/* ---------- Appels vocaux (WebRTC, signalisation via Firestore) ---------- */
+let pc=null,ms=null,cdoc=null,cunsub=null;
+function ov(h){$('call').innerHTML=h;$('call').style.display=h?'flex':'none'}
+function ui(n,st,acc){ov(`<div class="cav">${esc(ini(n))}</div><h2>${esc(n)}</h2><p>${st}</p><div class="cb">${acc?'<button class="ok" id="acc">📞</button>':''}<button class="no" id="hup">✖</button></div>`);$('hup').onclick=()=>endCall(true);if(acc)$('acc').onclick=acc}
+async function mkpc(){
+  ms=await navigator.mediaDevices.getUserMedia({audio:true});
+  pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  ms.getTracks().forEach(t=>pc.addTrack(t,ms));
+  pc.ontrack=e=>{let a=$('aud');if(!a){a=document.createElement('audio');a.id='aud';a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0]};
+}
+const gathered=()=>new Promise(r=>{if(pc.iceGatheringState==='complete')return r();const f=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',f);r()}};pc.addEventListener('icegatheringstatechange',f);setTimeout(r,4000)});
+function endCall(notify){
+  if(cunsub){cunsub();cunsub=null}
+  if(ms)ms.getTracks().forEach(t=>t.stop());
+  if(pc)pc.close();
+  pc=null;ms=null;
+  if(notify&&cdoc)updateDoc(cdoc,{state:'ended'}).catch(()=>{});
+  cdoc=null;ov('');
+}
+const FAIL='Appel impossible : autorise le micro pour Allô Libre.';
+async function startCall(p){
+  ui(p.name,'Appel en cours…');
+  try{
+    await mkpc();
+    const o=await pc.createOffer();await pc.setLocalDescription(o);await gathered();
+    cdoc=doc(db,'calls',p.uid);
+    await setDoc(cdoc,{from:me.uid,fromName:myName(),offer:pc.localDescription.sdp,state:'ringing',t:Date.now()});
+    cunsub=onSnapshot(cdoc,async s=>{
+      const d=s.data();if(!d||d.from!==me.uid||!pc)return;
+      if(d.state==='ended')return endCall(false);
+      if(d.answer&&!pc.currentRemoteDescription){await pc.setRemoteDescription({type:'answer',sdp:d.answer});ui(p.name,'En communication 🎧')}
+    });
+  }catch(e){endCall(false);ui(p.name,FAIL)}
+}
+async function answer(d){
+  try{
+    ui(d.fromName,'Connexion…');
+    await mkpc();
+    await pc.setRemoteDescription({type:'offer',sdp:d.offer});
+    const a=await pc.createAnswer();await pc.setLocalDescription(a);await gathered();
+    await updateDoc(cdoc,{answer:pc.localDescription.sdp,state:'active'});
+    ui(d.fromName,'En communication 🎧');
+  }catch(e){endCall(true);ui(d.fromName,FAIL)}
+}
+function listenCalls(){
+  if(callUn)callUn();
+  const r=doc(db,'calls',me.uid);
+  callUn=onSnapshot(r,s=>{
+    const d=s.data();if(!d||d.from===me.uid)return;
+    if(d.state==='ended'){endCall(false);return}
+    if(d.state==='ringing'&&Date.now()-d.t<60000&&!pc){cdoc=r;ui(d.fromName,'Appel entrant…',()=>answer(d))}
+  });
+}
+
+$('out').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,async u=>{
+  me=u;
+  if(!u){if(callUn){callUn();callUn=null}authView();return}
+  if(signing)return;
+  try{
+    const r=await getDoc(doc(db,'users',u.uid));
+    if(!r.exists()){const n=u.displayName||u.email.split('@')[0];await setDoc(doc(db,'users',u.uid),{name:n,nameLower:n.toLowerCase(),email:(u.email||'').toLowerCase()})}
+  }catch(e){}
+  home();listenCalls();
+});
+</script>
+</body>
+</html>
